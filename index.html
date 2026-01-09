@@ -32,36 +32,27 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
         
-        // 아이콘 컴포넌트 (Lucide 아이콘을 SVG로 직접 구현하거나 이미지 사용)
+        // 아이콘 컴포넌트
         const HeartIcon = ({ className }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5 4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
         );
         const PlayIcon = ({ size }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>);
         const SquareIcon = ({ size }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/></svg>);
-        const SparklesIcon = ({ size }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M9 3v4"/><path d="M3 5h4"/></svg>);
-        const RefreshCwIcon = ({ size }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>);
 
         function App() {
-            // *** API 키 설정 (주의: 웹에 배포할 땐 키가 노출될 수 있으므로 테스트용으로만 사용하세요) ***
-            const apiKey = ""; // 여기에 키를 입력하거나, 실행 시 입력받도록 할 수 있습니다.
-
+            // 상태 관리
             const [isActive, setIsActive] = useState(false);
             const [phase, setPhase] = useState('idle');
-            const [instruction, setInstruction] = useState('시작하려면 버튼을 누르세요');
-            const [mood, setMood] = useState('');
-            const [isGenerating, setIsGenerating] = useState(false);
-            const [showMoodInput, setShowMoodInput] = useState(true);
-            const [customGuide, setCustomGuide] = useState(null);
+            const [userInput, setUserInput] = useState(''); // 사용자 입력 저장
+            const [instruction, setInstruction] = useState('고민이 있다면 적어보세요');
             
             const timerRef = useRef(null);
 
-            const defaultGuide = {
+            const guide = {
                 inhale: '숨을 깊게 들이마시세요...',
                 hold: '잠시 멈추세요.',
                 exhale: '천천히 내뱉으세요...'
             };
-
-            const currentGuide = customGuide || defaultGuide;
 
             const getCircleStyle = () => {
                 switch (phase) {
@@ -72,83 +63,66 @@
                 }
             };
 
-            useEffect(() => {
-                if (isActive) {
-                    const runCycle = () => {
-                        setPhase('inhale');
-                        setInstruction(currentGuide.inhale);
-                        
-                        timerRef.current = setTimeout(() => {
-                            if (!isActive) return;
-                            setPhase('hold');
-                            setInstruction(currentGuide.hold);
-                            
-                            timerRef.current = setTimeout(() => {
-                                if (!isActive) return;
-                                setPhase('exhale');
-                                setInstruction(currentGuide.exhale);
-                                
-                                timerRef.current = setTimeout(runCycle, 4000);
-                            }, 2000);
-                        }, 4000);
-                    };
-                    runCycle();
+            // 시작/정지 토글 함수
+            const toggleBreathing = () => {
+                if (!isActive) {
+                    // 시작할 때: 입력값이 있으면 위로 메시지 설정
+                    if (userInput.trim()) {
+                        setInstruction(`"${userInput}"... 잠시 내려놓고 쉬어가세요`);
+                    } else {
+                        setInstruction('잠시 쉬어가세요');
+                    }
+                    setIsActive(true);
                 } else {
+                    // 멈출 때: 초기화
+                    setIsActive(false);
+                    setUserInput(''); // 입력창 비우기 (선택사항)
+                    setInstruction('고민이 있다면 적어보세요');
+                }
+            };
+
+            useEffect(() => {
+                // 활성화 상태가 아니면 타이머 정리 후 리턴
+                if (!isActive) {
                     clearTimeout(timerRef.current);
                     setPhase('idle');
-                    setInstruction(customGuide ? '편안해지셨나요?' : '편안해질 준비가 되셨나요?');
+                    return;
                 }
-                return () => clearTimeout(timerRef.current);
-            }, [isActive, currentGuide]);
 
-            const generateGuide = async () => {
-                if (!mood.trim()) return;
-                setIsGenerating(true);
-                
-                try {
-                    // 실제 배포 시에는 API 키를 서버에서 관리하는 것이 안전합니다.
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+                // 처음 시작할 때 3초 정도 위로 문구를 보여준 뒤 호흡 사이클 시작
+                const startDelay = setTimeout(() => {
+                    runCycle();
+                }, 3000); // 3초 대기
+
+                // 호흡 사이클 함수
+                const runCycle = () => {
+                    // 1. Inhale (4초)
+                    setPhase('inhale');
+                    setInstruction(guide.inhale);
                     
-                    const prompt = `
-                        사용자의 기분: "${mood}"
-                        호흡 명상 가이드를 JSON으로 생성.
-                        키: inhale, hold, exhale. (각 15자 내외 한국어)
-                        예시: {"inhale":"평온함을 마십니다","hold":"잠시 머뭅니다","exhale":"걱정을 보냅니다"}
-                        JSON만 출력.
-                    `;
+                    timerRef.current = setTimeout(() => {
+                        // 2. Hold (2초)
+                        setPhase('hold');
+                        setInstruction(guide.hold);
+                        
+                        timerRef.current = setTimeout(() => {
+                            // 3. Exhale (4초)
+                            setPhase('exhale');
+                            setInstruction(guide.exhale);
+                            
+                            timerRef.current = setTimeout(() => {
+                                // 사이클 재시작
+                                runCycle();
+                            }, 4000); 
+                        }, 2000); 
+                    }, 4000); 
+                };
 
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{ parts: [{ text: prompt }] }],
-                            generationConfig: { responseMimeType: "application/json" }
-                        })
-                    });
-
-                    const data = await response.json();
-                    const text = data.candidates[0].content.parts[0].text;
-                    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-                    const guide = JSON.parse(cleanText);
-                    
-                    setCustomGuide(guide);
-                    setInstruction(`"${mood}" 상태를 위한 준비 완료`);
-                    setShowMoodInput(false);
-                } catch (e) {
-                    console.error(e);
-                    alert("가이드를 생성하지 못했습니다. (API 키를 확인해주세요)");
-                } finally {
-                    setIsGenerating(false);
-                }
-            };
-
-            const resetMode = () => {
-                setIsActive(false);
-                setCustomGuide(null);
-                setMood('');
-                setShowMoodInput(true);
-                setInstruction('시작하려면 버튼을 누르세요');
-            };
+                return () => {
+                    clearTimeout(startDelay);
+                    clearTimeout(timerRef.current);
+                };
+            }, [isActive]);
 
             return (
                 <div className="min-h-screen flex flex-col items-center justify-center p-6 relative font-sans">
@@ -165,41 +139,21 @@
                                 <span className="text-xs font-medium tracking-widest uppercase">Mindful Breathing</span>
                             </div>
                             <h1 className="text-3xl md:text-4xl font-light tracking-tight text-white/90">
-                                {customGuide ? '나만의 휴식' : '잠시 쉬어가세요'}
+                                잠시 쉬어가세요
                             </h1>
                         </div>
 
-                        {/* 입력창 */}
-                        {!isActive && showMoodInput && (
-                            <div className="w-full bg-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/10 shadow-xl">
-                                <label className="block text-sm text-slate-300 mb-2 font-light">지금 기분이 어떠신가요?</label>
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="text" 
-                                        value={mood}
-                                        onChange={(e) => setMood(e.target.value)}
-                                        placeholder="예: 불안해, 피곤해"
-                                        className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-400/50"
-                                        onKeyDown={(e) => e.key === 'Enter' && generateGuide()}
-                                    />
-                                    <button 
-                                        onClick={generateGuide}
-                                        disabled={isGenerating || !mood.trim()}
-                                        className="bg-rose-500 hover:bg-rose-600 disabled:bg-slate-700 text-white rounded-xl px-4 flex items-center justify-center transition-all"
-                                    >
-                                        {isGenerating ? <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div> : <SparklesIcon size={18} />}
-                                    </button>
-                                </div>
-                                <p className="text-[10px] text-slate-500 mt-2 text-center">Powered by Gemini ✨</p>
-                            </div>
-                        )}
-
-                        {/* 커스텀 모드 배지 */}
-                        {!isActive && !showMoodInput && customGuide && (
-                            <div className="flex items-center gap-2 text-rose-300 bg-rose-500/10 px-4 py-2 rounded-full text-sm border border-rose-500/20">
-                                <SparklesIcon size={14} />
-                                <span>맞춤형 가이드 적용됨</span>
-                                <button onClick={resetMode} className="ml-2 hover:text-white"><RefreshCwIcon size={14} /></button>
+                        {/* 입력창 (활성화되지 않았을 때만 표시) */}
+                        {!isActive && (
+                            <div className="w-full bg-white/10 backdrop-blur-md rounded-xl p-1 border border-white/20 shadow-lg flex transition-all">
+                                <input 
+                                    type="text" 
+                                    value={userInput}
+                                    onChange={(e) => setUserInput(e.target.value)}
+                                    placeholder="지금 머릿속을 맴도는 생각은?"
+                                    className="flex-1 bg-transparent px-4 py-3 text-white placeholder-slate-400 focus:outline-none"
+                                    onKeyDown={(e) => e.key === 'Enter' && toggleBreathing()}
+                                />
                             </div>
                         )}
 
@@ -216,8 +170,8 @@
                             </div>
                         </div>
 
-                        {/* 텍스트 */}
-                        <div className="h-20 flex items-center justify-center w-full">
+                        {/* 텍스트 가이드 */}
+                        <div className="h-20 flex items-center justify-center w-full px-4">
                             <p className={`text-xl font-light text-center transition-all duration-700 ${isActive ? 'text-white' : 'text-slate-400'}`}>
                                 {instruction}
                             </p>
@@ -225,7 +179,7 @@
 
                         {/* 버튼 */}
                         <button
-                            onClick={() => setIsActive(!isActive)}
+                            onClick={toggleBreathing}
                             className={`px-8 py-4 rounded-full flex items-center gap-3 transition-all duration-300 ${isActive ? 'bg-rose-500/10 text-rose-300 border border-rose-500/50' : 'bg-white text-slate-900 hover:scale-105'}`}
                         >
                             {isActive ? <><SquareIcon size={18} /><span className="font-medium">그만하기</span></> : <><PlayIcon size={18} /><span className="font-medium">시작하기</span></>}
