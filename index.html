@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mindful Breathing</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel (JSX 변환용) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* 커스텀 애니메이션 */
+        @keyframes blob {
+            0% { transform: translate(0px, 0px) scale(1); }
+            33% { transform: translate(30px, -50px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.9); }
+            100% { transform: translate(0px, 0px) scale(1); }
+        }
+        .animate-blob { animation: blob 7s infinite; }
+        .animation-delay-2000 { animation-delay: 2s; }
+        .animation-delay-4000 { animation-delay: 4s; }
+    </style>
+</head>
+<body class="bg-slate-900 text-white overflow-hidden">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        
+        // 아이콘 컴포넌트 (Lucide 아이콘을 SVG로 직접 구현하거나 이미지 사용)
+        const HeartIcon = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5 4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+        );
+        const PlayIcon = ({ size }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>);
+        const SquareIcon = ({ size }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/></svg>);
+        const SparklesIcon = ({ size }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M9 3v4"/><path d="M3 5h4"/></svg>);
+        const RefreshCwIcon = ({ size }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>);
+
+        function App() {
+            // *** API 키 설정 (주의: 웹에 배포할 땐 키가 노출될 수 있으므로 테스트용으로만 사용하세요) ***
+            const apiKey = ""; // 여기에 키를 입력하거나, 실행 시 입력받도록 할 수 있습니다.
+
+            const [isActive, setIsActive] = useState(false);
+            const [phase, setPhase] = useState('idle');
+            const [instruction, setInstruction] = useState('시작하려면 버튼을 누르세요');
+            const [mood, setMood] = useState('');
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [showMoodInput, setShowMoodInput] = useState(true);
+            const [customGuide, setCustomGuide] = useState(null);
+            
+            const timerRef = useRef(null);
+
+            const defaultGuide = {
+                inhale: '숨을 깊게 들이마시세요...',
+                hold: '잠시 멈추세요.',
+                exhale: '천천히 내뱉으세요...'
+            };
+
+            const currentGuide = customGuide || defaultGuide;
+
+            const getCircleStyle = () => {
+                switch (phase) {
+                    case 'inhale': return 'scale-150 bg-blue-400/30 border-blue-200 shadow-[0_0_60px_rgba(96,165,250,0.6)]';
+                    case 'hold': return 'scale-150 bg-indigo-400/30 border-indigo-200 shadow-[0_0_80px_rgba(129,140,248,0.6)]';
+                    case 'exhale': return 'scale-100 bg-teal-400/30 border-teal-200 shadow-[0_0_30px_rgba(45,212,191,0.4)]';
+                    default: return 'scale-100 bg-gray-300/20 border-gray-300 shadow-none';
+                }
+            };
+
+            useEffect(() => {
+                if (isActive) {
+                    const runCycle = () => {
+                        setPhase('inhale');
+                        setInstruction(currentGuide.inhale);
+                        
+                        timerRef.current = setTimeout(() => {
+                            if (!isActive) return;
+                            setPhase('hold');
+                            setInstruction(currentGuide.hold);
+                            
+                            timerRef.current = setTimeout(() => {
+                                if (!isActive) return;
+                                setPhase('exhale');
+                                setInstruction(currentGuide.exhale);
+                                
+                                timerRef.current = setTimeout(runCycle, 4000);
+                            }, 2000);
+                        }, 4000);
+                    };
+                    runCycle();
+                } else {
+                    clearTimeout(timerRef.current);
+                    setPhase('idle');
+                    setInstruction(customGuide ? '편안해지셨나요?' : '편안해질 준비가 되셨나요?');
+                }
+                return () => clearTimeout(timerRef.current);
+            }, [isActive, currentGuide]);
+
+            const generateGuide = async () => {
+                if (!mood.trim()) return;
+                setIsGenerating(true);
+                
+                try {
+                    // 실제 배포 시에는 API 키를 서버에서 관리하는 것이 안전합니다.
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+                    
+                    const prompt = `
+                        사용자의 기분: "${mood}"
+                        호흡 명상 가이드를 JSON으로 생성.
+                        키: inhale, hold, exhale. (각 15자 내외 한국어)
+                        예시: {"inhale":"평온함을 마십니다","hold":"잠시 머뭅니다","exhale":"걱정을 보냅니다"}
+                        JSON만 출력.
+                    `;
+
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }],
+                            generationConfig: { responseMimeType: "application/json" }
+                        })
+                    });
+
+                    const data = await response.json();
+                    const text = data.candidates[0].content.parts[0].text;
+                    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                    const guide = JSON.parse(cleanText);
+                    
+                    setCustomGuide(guide);
+                    setInstruction(`"${mood}" 상태를 위한 준비 완료`);
+                    setShowMoodInput(false);
+                } catch (e) {
+                    console.error(e);
+                    alert("가이드를 생성하지 못했습니다. (API 키를 확인해주세요)");
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            const resetMode = () => {
+                setIsActive(false);
+                setCustomGuide(null);
+                setMood('');
+                setShowMoodInput(true);
+                setInstruction('시작하려면 버튼을 누르세요');
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col items-center justify-center p-6 relative font-sans">
+                    {/* 배경 애니메이션 */}
+                    <div className="absolute top-10 left-10 w-64 h-64 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
+                    <div className="absolute top-10 right-10 w-64 h-64 bg-cyan-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+                    <div className="absolute -bottom-8 left-20 w-64 h-64 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
+
+                    <div className="z-10 flex flex-col items-center gap-10 max-w-md w-full">
+                        {/* 헤더 */}
+                        <div className="text-center space-y-2">
+                            <div className="flex items-center justify-center gap-2 text-rose-300 mb-2">
+                                <HeartIcon className={isActive ? "animate-pulse" : ""} />
+                                <span className="text-xs font-medium tracking-widest uppercase">Mindful Breathing</span>
+                            </div>
+                            <h1 className="text-3xl md:text-4xl font-light tracking-tight text-white/90">
+                                {customGuide ? '나만의 휴식' : '잠시 쉬어가세요'}
+                            </h1>
+                        </div>
+
+                        {/* 입력창 */}
+                        {!isActive && showMoodInput && (
+                            <div className="w-full bg-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/10 shadow-xl">
+                                <label className="block text-sm text-slate-300 mb-2 font-light">지금 기분이 어떠신가요?</label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text" 
+                                        value={mood}
+                                        onChange={(e) => setMood(e.target.value)}
+                                        placeholder="예: 불안해, 피곤해"
+                                        className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-400/50"
+                                        onKeyDown={(e) => e.key === 'Enter' && generateGuide()}
+                                    />
+                                    <button 
+                                        onClick={generateGuide}
+                                        disabled={isGenerating || !mood.trim()}
+                                        className="bg-rose-500 hover:bg-rose-600 disabled:bg-slate-700 text-white rounded-xl px-4 flex items-center justify-center transition-all"
+                                    >
+                                        {isGenerating ? <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div> : <SparklesIcon size={18} />}
+                                    </button>
+                                </div>
+                                <p className="text-[10px] text-slate-500 mt-2 text-center">Powered by Gemini ✨</p>
+                            </div>
+                        )}
+
+                        {/* 커스텀 모드 배지 */}
+                        {!isActive && !showMoodInput && customGuide && (
+                            <div className="flex items-center gap-2 text-rose-300 bg-rose-500/10 px-4 py-2 rounded-full text-sm border border-rose-500/20">
+                                <SparklesIcon size={14} />
+                                <span>맞춤형 가이드 적용됨</span>
+                                <button onClick={resetMode} className="ml-2 hover:text-white"><RefreshCwIcon size={14} /></button>
+                            </div>
+                        )}
+
+                        {/* 호흡 원 */}
+                        <div className="relative flex items-center justify-center h-80 w-80">
+                            <div className="absolute w-48 h-48 border border-white/10 rounded-full"></div>
+                            <div className={`w-48 h-48 rounded-full border-2 backdrop-blur-sm flex items-center justify-center transition-all ease-in-out duration-[4000ms] ${getCircleStyle()}`}
+                                 style={{ transitionDuration: phase === 'hold' ? '2000ms' : '4000ms' }}>
+                                {isActive ? (
+                                    <span className={`text-4xl transition-opacity duration-1000 ${phase === 'exhale' ? 'opacity-50' : 'opacity-100'}`}>💨</span>
+                                ) : (
+                                    <span className="text-4xl animate-bounce">🌿</span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* 텍스트 */}
+                        <div className="h-20 flex items-center justify-center w-full">
+                            <p className={`text-xl font-light text-center transition-all duration-700 ${isActive ? 'text-white' : 'text-slate-400'}`}>
+                                {instruction}
+                            </p>
+                        </div>
+
+                        {/* 버튼 */}
+                        <button
+                            onClick={() => setIsActive(!isActive)}
+                            className={`px-8 py-4 rounded-full flex items-center gap-3 transition-all duration-300 ${isActive ? 'bg-rose-500/10 text-rose-300 border border-rose-500/50' : 'bg-white text-slate-900 hover:scale-105'}`}
+                        >
+                            {isActive ? <><SquareIcon size={18} /><span className="font-medium">그만하기</span></> : <><PlayIcon size={18} /><span className="font-medium">시작하기</span></>}
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
